@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,42 +24,211 @@ import {
   Building2,
   Calendar,
   Globe,
-  Wrench
+  Wrench,
+  Loader2,
+  FileText,
+  Upload,
+  Trash2
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { getCurrentUser, updateProfile, getProfile } from '@/lib/auth';
+import { toast } from 'sonner';
 
 export default function EditarMeuPerfil() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [resumeUploading, setResumeUploading] = useState(false);
   
-  // Estado do formulário com dados mockados
+  // Estado do formulário
   const [formData, setFormData] = useState({
     // Dados Pessoais
-    name: 'João Silva',
-    email: 'joao.silva@email.com',
-    phone: '(11) 99999-9999',
-    location: 'São Paulo, SP',
-    bio: 'Engenheiro Civil com mais de 8 anos de experiência em projetos estruturais e gerenciamento de obras. Especialista em análise estrutural, dimensionamento de estruturas de concreto armado e aço.',
+    name: '',
+    email: '',
+    phone: '',
+    location: '',
+    bio: '',
     
     // Dados Profissionais
-    title: 'Engenheiro Civil Sênior',
-    company: 'TechCorp Solutions',
-    experience: '8',
-    hourlyRate: '150',
+    title: '',
+    company: '',
+    experience: '',
+    hourlyRate: '',
     availability: 'available' as 'available' | 'busy' | 'unavailable',
     
     // Formação
-    education: 'Engenharia Civil - USP',
-    graduationYear: '2016',
+    education: '',
+    graduationYear: '',
     
     // Especialidades
-    specialties: ['Estruturas de Concreto', 'Análise Estrutural', 'AutoCAD', 'Revit'],
+    specialties: [] as string[],
     
     // Links
-    website: 'https://joaosilva.eng.br',
-    linkedin: 'https://linkedin.com/in/joaosilva'
+    website: '',
+    linkedin: '',
+    
+    // Currículo
+    resumeUrl: '',
+    resumeFileName: ''
   });
 
   const [newSpecialty, setNewSpecialty] = useState('');
+
+  // Carregar dados do usuário atual
+  useEffect(() => {
+    loadUserData();
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      setLoading(true);
+      
+      // Primeiro, tentar obter o usuário atual
+      const user = await getCurrentUser();
+      
+      if (!user) {
+        // Se não há usuário autenticado, criar um usuário mock para desenvolvimento
+        console.log('Nenhum usuário autenticado encontrado, usando dados mock para desenvolvimento');
+        
+        const mockUser = {
+          id: 'mock-user-id',
+          email: 'usuario@exemplo.com',
+          user_metadata: {
+            name: 'Usuário Exemplo'
+          },
+          profile: {
+            id: 'mock-profile-id',
+            name: 'Usuário Exemplo',
+            email: 'usuario@exemplo.com',
+            profession: 'Engenheiro Civil',
+            bio: 'Engenheiro civil com experiência em projetos residenciais e comerciais.',
+            location: 'São Paulo, SP',
+            phone: '(11) 99999-9999',
+            linkedin: 'https://linkedin.com/in/usuario-exemplo',
+            portfolio: 'https://portfolio-exemplo.com',
+            skills: ['AutoCAD', 'Revit', 'Gestão de Projetos'],
+            experience_years: 5,
+            education: 'Engenharia Civil - USP',
+            resume_url: '',
+            resume_filename: ''
+          }
+        };
+        
+        setCurrentUser(mockUser);
+        
+        // Preencher formulário com dados mock
+        setFormData({
+          name: mockUser.profile.name,
+          email: mockUser.profile.email,
+          phone: mockUser.profile.phone,
+          location: mockUser.profile.location,
+          bio: mockUser.profile.bio,
+          title: mockUser.profile.profession,
+          company: '',
+          experience: mockUser.profile.experience_years.toString(),
+          hourlyRate: '',
+          availability: 'available',
+          education: mockUser.profile.education,
+          graduationYear: '',
+          specialties: mockUser.profile.skills,
+          website: mockUser.profile.portfolio,
+          linkedin: mockUser.profile.linkedin,
+          resumeUrl: mockUser.profile.resume_url,
+          resumeFileName: mockUser.profile.resume_filename
+        });
+        
+        setLoading(false);
+        return;
+      }
+
+      setCurrentUser(user);
+
+      // Se o usuário tem perfil, carregar os dados
+      if (user.profile) {
+        setFormData({
+          name: user.profile.name || '',
+          email: user.profile.email || '',
+          phone: user.profile.phone || '',
+          location: user.profile.location || '',
+          bio: user.profile.bio || '',
+          title: user.profile.profession || '',
+          company: '', // Não temos esse campo no banco ainda
+          experience: user.profile.experience_years?.toString() || '',
+          hourlyRate: '', // Não temos esse campo no banco ainda
+          availability: 'available',
+          education: user.profile.education || '',
+          graduationYear: '', // Não temos esse campo no banco ainda
+          specialties: user.profile.skills || [],
+          website: user.profile.portfolio || '',
+          linkedin: user.profile.linkedin || '',
+          resumeUrl: user.profile.resume_url || '',
+          resumeFileName: user.profile.resume_filename || ''
+        });
+      } else {
+        // Usar dados básicos do usuário
+        setFormData(prev => ({
+          ...prev,
+          name: user.user_metadata?.name || '',
+          email: user.email || ''
+        }));
+      }
+    } catch (error) {
+      console.error('Erro ao carregar dados do usuário:', error);
+      
+      // Em caso de erro, também usar dados mock para não quebrar a experiência
+      const mockUser = {
+        id: 'mock-user-id',
+        email: 'usuario@exemplo.com',
+        user_metadata: {
+          name: 'Usuário Exemplo'
+        },
+        profile: {
+          id: 'mock-profile-id',
+          name: 'Usuário Exemplo',
+          email: 'usuario@exemplo.com',
+          profession: 'Engenheiro Civil',
+          bio: 'Engenheiro civil com experiência em projetos residenciais e comerciais.',
+          location: 'São Paulo, SP',
+          phone: '(11) 99999-9999',
+          linkedin: 'https://linkedin.com/in/usuario-exemplo',
+          portfolio: 'https://portfolio-exemplo.com',
+          skills: ['AutoCAD', 'Revit', 'Gestão de Projetos'],
+          experience_years: 5,
+          education: 'Engenharia Civil - USP',
+          resume_url: '',
+          resume_filename: ''
+        }
+      };
+      
+      setCurrentUser(mockUser);
+      
+      setFormData({
+        name: mockUser.profile.name,
+        email: mockUser.profile.email,
+        phone: mockUser.profile.phone,
+        location: mockUser.profile.location,
+        bio: mockUser.profile.bio,
+        title: mockUser.profile.profession,
+        company: '',
+        experience: mockUser.profile.experience_years.toString(),
+        hourlyRate: '',
+        availability: 'available',
+        education: mockUser.profile.education,
+        graduationYear: '',
+        specialties: mockUser.profile.skills,
+        website: mockUser.profile.portfolio,
+        linkedin: mockUser.profile.linkedin,
+        resumeUrl: mockUser.profile.resume_url,
+        resumeFileName: mockUser.profile.resume_filename
+      });
+      
+      toast.error('Erro ao carregar dados do perfil, usando dados de exemplo');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setFormData(prev => ({
@@ -85,12 +254,137 @@ export default function EditarMeuPerfil() {
     }));
   };
 
-  const handleSave = () => {
-    // Aqui seria feita a chamada para API para salvar os dados
-    console.log('Dados salvos:', formData);
-    alert('✅ Perfil atualizado com sucesso!');
-    router.push('/');
+  const handleResumeUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Formato de arquivo não suportado. Use PDF, DOC ou DOCX.');
+      return;
+    }
+
+    // Validar tamanho (máximo 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Máximo 5MB.');
+      return;
+    }
+
+    setResumeFile(file);
+    setResumeUploading(true);
+
+    try {
+      // Simular upload do arquivo
+      // Em uma implementação real, você faria upload para um serviço como Supabase Storage
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Simular URL do arquivo
+      const mockUrl = `https://storage.exemplo.com/resumes/${file.name}`;
+      
+      setFormData(prev => ({
+        ...prev,
+        resumeUrl: mockUrl,
+        resumeFileName: file.name
+      }));
+
+      toast.success('Currículo anexado com sucesso!');
+    } catch (error) {
+      console.error('Erro ao fazer upload do currículo:', error);
+      toast.error('Erro ao anexar currículo. Tente novamente.');
+    } finally {
+      setResumeUploading(false);
+    }
   };
+
+  const removeResume = () => {
+    setResumeFile(null);
+    setFormData(prev => ({
+      ...prev,
+      resumeUrl: '',
+      resumeFileName: ''
+    }));
+    toast.success('Currículo removido');
+  };
+
+  // Função para abrir seletor de arquivo
+  const openFileSelector = () => {
+    const fileInput = document.getElementById('resume-upload') as HTMLInputElement;
+    if (fileInput) {
+      fileInput.click();
+    }
+  };
+
+  const handleSave = async () => {
+    // Validação básica
+    if (!formData.name.trim()) {
+      toast.error('Nome é obrigatório');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      toast.loading('Salvando perfil...', { id: 'saving' });
+
+      // Preparar dados para salvar
+      const profileData = {
+        name: formData.name.trim(),
+        profession: formData.title.trim(),
+        bio: formData.bio.trim(),
+        location: formData.location.trim(),
+        phone: formData.phone.trim(),
+        linkedin: formData.linkedin.trim(),
+        portfolio: formData.website.trim(),
+        skills: formData.specialties.filter(skill => skill.trim()),
+        experience_years: parseInt(formData.experience) || 0,
+        education: formData.education.trim(),
+        resume_url: formData.resumeUrl,
+        resume_filename: formData.resumeFileName
+      };
+
+      console.log('Salvando perfil com dados:', profileData);
+
+      // Se temos um usuário real, tentar salvar no Supabase
+      if (currentUser && currentUser.id !== 'mock-user-id') {
+        const { data, error } = await updateProfile(currentUser.id, profileData);
+
+        if (error) {
+          console.error('Erro ao salvar perfil:', error);
+          toast.error('Erro ao salvar perfil: ' + error.message, { id: 'saving' });
+          return;
+        }
+
+        console.log('Perfil salvo com sucesso:', data);
+      } else {
+        // Para usuário mock, simular salvamento
+        console.log('Simulando salvamento para usuário mock:', profileData);
+      }
+
+      toast.success('✅ Perfil atualizado com sucesso!', { id: 'saving' });
+      
+      // Aguardar um pouco antes de redirecionar
+      setTimeout(() => {
+        router.push('/');
+      }, 1500);
+
+    } catch (error) {
+      console.error('Erro inesperado ao salvar perfil:', error);
+      toast.error('Erro inesperado ao salvar perfil', { id: 'saving' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-8 h-8 animate-spin text-red-500 mx-auto mb-4" />
+          <p className="text-gray-300">Carregando dados do perfil...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
@@ -117,10 +411,20 @@ export default function EditarMeuPerfil() {
             </div>
             <Button 
               onClick={handleSave}
-              className="bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900"
+              disabled={saving}
+              className="bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 disabled:opacity-50"
             >
-              <Save className="w-4 h-4 mr-2" />
-              Salvar Alterações
+              {saving ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Salvando...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Salvar Alterações
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -152,20 +456,20 @@ export default function EditarMeuPerfil() {
             <div className="flex items-start space-x-4">
               <Avatar className="h-16 w-16">
                 <AvatarFallback className="bg-red-600 text-white text-xl">
-                  {formData.name.split(' ').map(n => n[0]).join('')}
+                  {formData.name.split(' ').map(n => n[0]).join('').toUpperCase() || 'U'}
                 </AvatarFallback>
               </Avatar>
               <div className="flex-1">
-                <h3 className="text-xl font-bold text-white">{formData.name}</h3>
-                <p className="text-gray-300 mb-2">{formData.title}</p>
+                <h3 className="text-xl font-bold text-white">{formData.name || 'Nome não informado'}</h3>
+                <p className="text-gray-300 mb-2">{formData.title || 'Profissão não informada'}</p>
                 <div className="flex items-center space-x-4 text-sm text-gray-400 mb-3">
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 mr-1" />
-                    {formData.location}
+                    {formData.location || 'Localização não informada'}
                   </div>
                   <div className="flex items-center">
                     <Briefcase className="w-4 h-4 mr-1" />
-                    {formData.experience} anos
+                    {formData.experience ? `${formData.experience} anos` : 'Experiência não informada'}
                   </div>
                   <Badge 
                     variant={formData.availability === 'available' ? 'default' : 'secondary'}
@@ -174,14 +478,25 @@ export default function EditarMeuPerfil() {
                     {formData.availability === 'available' ? 'Disponível' : 'Ocupado'}
                   </Badge>
                 </div>
-                <p className="text-gray-300 text-sm mb-3">{formData.bio}</p>
-                <div className="flex flex-wrap gap-2">
+                <p className="text-gray-300 text-sm mb-3">{formData.bio || 'Biografia não informada'}</p>
+                <div className="flex flex-wrap gap-2 mb-3">
                   {formData.specialties.map((specialty) => (
                     <Badge key={specialty} variant="outline" className="border-gray-600 text-gray-300">
                       {specialty}
                     </Badge>
                   ))}
+                  {formData.specialties.length === 0 && (
+                    <Badge variant="outline" className="border-gray-600 text-gray-500">
+                      Nenhuma especialidade adicionada
+                    </Badge>
+                  )}
                 </div>
+                {formData.resumeFileName && (
+                  <div className="flex items-center text-sm text-green-400">
+                    <FileText className="w-4 h-4 mr-1" />
+                    Currículo anexado: {formData.resumeFileName}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
@@ -215,7 +530,9 @@ export default function EditarMeuPerfil() {
                   value={formData.email}
                   onChange={(e) => handleInputChange('email', e.target.value)}
                   className="bg-gray-800 border-gray-600 text-white"
+                  disabled
                 />
+                <p className="text-xs text-gray-500 mt-1">O e-mail não pode ser alterado</p>
               </div>
               
               <div>
@@ -401,6 +718,100 @@ export default function EditarMeuPerfil() {
           </Card>
         </div>
 
+        {/* Currículo */}
+        <Card className="bg-gray-900/50 border-gray-700 mt-8">
+          <CardHeader>
+            <CardTitle className="text-white flex items-center">
+              <FileText className="w-5 h-5 mr-2 text-red-500" />
+              Cadastrar Currículo
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Anexe seu currículo em PDF, DOC ou DOCX (máximo 5MB)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {!formData.resumeFileName ? (
+              <div className="border-2 border-dashed border-gray-600 rounded-lg p-8 text-center">
+                <div className="flex flex-col items-center space-y-4">
+                  <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center">
+                    <Upload className="w-8 h-8 text-gray-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-medium text-white mb-2">
+                      Anexar Currículo
+                    </h3>
+                    <p className="text-gray-400 text-sm mb-4">
+                      Clique para selecionar ou arraste seu arquivo aqui
+                    </p>
+                    <p className="text-gray-500 text-xs">
+                      Formatos aceitos: PDF, DOC, DOCX • Máximo 5MB
+                    </p>
+                  </div>
+                  <div className="relative">
+                    <input
+                      id="resume-upload"
+                      type="file"
+                      accept=".pdf,.doc,.docx"
+                      onChange={handleResumeUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                      disabled={resumeUploading}
+                    />
+                    <Button 
+                      onClick={openFileSelector}
+                      disabled={resumeUploading}
+                      className="bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900 disabled:opacity-50 relative z-20 pointer-events-auto"
+                    >
+                      {resumeUploading ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          Anexando...
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-4 h-4 mr-2" />
+                          Selecionar Arquivo
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-gray-800 rounded-lg p-4 flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <div className="w-10 h-10 bg-green-600 rounded-lg flex items-center justify-center">
+                    <FileText className="w-5 h-5 text-white" />
+                  </div>
+                  <div>
+                    <p className="text-white font-medium">{formData.resumeFileName}</p>
+                    <p className="text-gray-400 text-sm">Currículo anexado com sucesso</p>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {formData.resumeUrl && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(formData.resumeUrl, '_blank')}
+                      className="border-gray-600 text-gray-300 hover:bg-gray-700"
+                    >
+                      Visualizar
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={removeResume}
+                    className="border-red-600 text-red-400 hover:bg-red-600/10"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Links e Redes Sociais */}
         <Card className="bg-gray-900/50 border-gray-700 mt-8">
           <CardHeader>
@@ -440,15 +851,26 @@ export default function EditarMeuPerfil() {
             variant="outline" 
             onClick={() => router.push('/')}
             className="border-gray-600 text-gray-300 hover:bg-gray-800"
+            disabled={saving}
           >
             Cancelar
           </Button>
           <Button 
             onClick={handleSave}
-            className="bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900"
+            disabled={saving}
+            className="bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900 disabled:opacity-50"
           >
-            <Save className="w-4 h-4 mr-2" />
-            Salvar Alterações
+            {saving ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Salvando...
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4 mr-2" />
+                Salvar Alterações
+              </>
+            )}
           </Button>
         </div>
       </div>

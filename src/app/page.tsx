@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,13 +52,12 @@ import { LoginForm } from '@/components/LoginForm';
 import { SignupForm } from '@/components/SignupForm';
 import { ProfileSetup } from '@/components/ProfileSetup';
 import { Project, Engineer, Proposal, ProposalStatus, User } from '@/lib/types';
-import { useAuth } from '@/components/AuthProvider';
 
 type AppState = 'landing' | 'login' | 'signup' | 'profile-setup' | 'dashboard';
 
 export default function Home() {
-  const { user, loading, signOut } = useAuth();
   const [appState, setAppState] = useState<AppState>('landing');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [signupData, setSignupData] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -71,39 +70,27 @@ export default function Home() {
   const [projectToView, setProjectToView] = useState<Project | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Efeito para gerenciar estado baseado na autenticação
-  useEffect(() => {
-    if (!loading) {
-      if (user) {
-        if (!user.profile) {
-          setAppState('profile-setup');
-        } else {
-          setAppState('dashboard');
-        }
-      } else {
-        setAppState('landing');
-      }
-    }
-  }, [user, loading]);
-
-  const handleLogin = () => {
-    // O AuthProvider já gerencia o estado do usuário
-    // Não precisamos fazer nada aqui
+  const handleLogin = (credentials: { email: string; password: string }) => {
+    // Simular login - em produção, fazer chamada para API
+    const mockUser: User = {
+      id: '1',
+      name: 'João Silva',
+      email: credentials.email,
+      type: 'company', // Seria determinado pela API
+      createdAt: new Date()
+    };
+    setCurrentUser(mockUser);
+    setAppState('dashboard');
   };
 
   const handleSignup = (userData: { name: string; email: string; password: string }) => {
     setSignupData(userData);
-    // O AuthProvider já criou o usuário, mas ainda não tem perfil completo
     setAppState('profile-setup');
   };
 
-  const handleProfileComplete = async (profileData: any) => {
-    // Atualizar perfil no Supabase
-    if (user) {
-      const { updateProfile } = await import('@/lib/auth');
-      await updateProfile(user.id, profileData);
-      setAppState('dashboard');
-    }
+  const handleProfileComplete = (profileData: any) => {
+    setCurrentUser(profileData);
+    setAppState('dashboard');
   };
 
   const handleCreateProject = (projectData: any) => {
@@ -113,8 +100,8 @@ export default function Home() {
       companyId: '1',
       company: {
         id: '1',
-        name: user?.profile?.name || 'Usuário',
-        email: user?.email || '',
+        name: 'João Silva',
+        email: 'joao@techcorp.com',
         type: 'company',
         companyName: 'TechCorp Solutions',
         cnpj: '12.345.678/0001-90',
@@ -170,8 +157,10 @@ export default function Home() {
     }
   };
 
+  // NOVA FUNÇÃO: Enviar currículo do candidato para o painel da empresa
   const handleSubmitApplication = () => {
     if (selectedFile && projectToView) {
+      // Criar nova proposta com dados do currículo do engenheiro
       const curriculumProposal: Proposal = {
         id: Date.now().toString(),
         projectId: projectToView.id,
@@ -190,9 +179,33 @@ export default function Home() {
         }]
       };
 
+      // Adicionar proposta à lista (será visível no painel da empresa)
       setProposals(prev => [curriculumProposal, ...prev]);
 
-      alert(`✅ Currículo enviado com sucesso!\\n\\nSeus dados profissionais e o arquivo \"${selectedFile.name}\" foram enviados para ${projectToView.company.companyName}.\\n\\nO recrutador poderá visualizar:\\n• Seu perfil completo\\n• Experiência e especialidades\\n• Currículo anexado\\n• Informações de contato\\n\\nVocê será notificado sobre o status da sua candidatura.`);
+      // Simular notificação para a empresa
+      const companyNotification = {
+        type: 'new_application',
+        message: `Nova candidatura recebida de ${selectedEngineer.name} para a vaga "${projectToView.title}"`,
+        engineerData: {
+          name: selectedEngineer.name,
+          email: selectedEngineer.email,
+          title: selectedEngineer.title,
+          experience: selectedEngineer.experience,
+          specialties: selectedEngineer.specialties,
+          location: selectedEngineer.location,
+          rating: selectedEngineer.rating,
+          hourlyRate: selectedEngineer.hourlyRate,
+          availability: selectedEngineer.availability,
+          phone: selectedEngineer.phone || 'Não informado'
+        },
+        curriculumFile: selectedFile.name,
+        timestamp: new Date()
+      };
+
+      // Em produção, isso seria enviado via API para o painel da empresa
+      console.log('Dados enviados para o painel da empresa:', companyNotification);
+
+      alert(`✅ Currículo enviado com sucesso!\n\nSeus dados profissionais e o arquivo "${selectedFile.name}" foram enviados para ${projectToView.company.companyName}.\n\nO recrutador poderá visualizar:\n• Seu perfil completo\n• Experiência e especialidades\n• Currículo anexado\n• Informações de contato\n\nVocê será notificado sobre o status da sua candidatura.`);
       
       setSelectedFile(null);
       setShowProjectDetails(false);
@@ -200,20 +213,6 @@ export default function Home() {
       alert('Por favor, selecione um arquivo PDF do seu currículo.');
     }
   };
-
-  const handleSignOut = async () => {
-    await signOut();
-    setAppState('landing');
-  };
-
-  // Loading state
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
-        <div className="text-white">Carregando...</div>
-      </div>
-    );
-  }
 
   // Renderizar diferentes estados da aplicação
   if (appState === 'login') {
@@ -234,24 +233,16 @@ export default function Home() {
     );
   }
 
-  if (appState === 'profile-setup' && (signupData || user)) {
+  if (appState === 'profile-setup' && signupData) {
     return (
       <ProfileSetup 
-        userData={signupData || { name: user?.user_metadata?.name || '', email: user?.email || '' }}
+        userData={signupData}
         onComplete={handleProfileComplete}
       />
     );
   }
 
-  if (appState === 'dashboard' && user) {
-    const currentUser: User = {
-      id: user.id,
-      name: user.profile?.name || user.user_metadata?.name || 'Usuário',
-      email: user.email || '',
-      type: 'company', // Seria determinado pelo perfil
-      createdAt: new Date(user.created_at)
-    };
-
+  if (appState === 'dashboard' && currentUser) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
         {/* Header */}
@@ -274,7 +265,10 @@ export default function Home() {
                 <Button 
                   variant="ghost" 
                   className="text-gray-300 hover:text-white"
-                  onClick={handleSignOut}
+                  onClick={() => {
+                    setCurrentUser(null);
+                    setAppState('landing');
+                  }}
                 >
                   Sair
                 </Button>
@@ -381,7 +375,10 @@ export default function Home() {
                     
                     <DropdownMenuItem 
                       className="text-red-300 hover:text-red-200 hover:bg-red-900/20 cursor-pointer px-4 py-3"
-                      onClick={handleSignOut}
+                      onClick={() => {
+                        setCurrentUser(null);
+                        setAppState('landing');
+                      }}
                     >
                       <LogOut className="mr-3 h-4 w-4" />
                       <div className="font-medium">Sair da Conta</div>

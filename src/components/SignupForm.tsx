@@ -5,178 +5,233 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Loader2, Mail, Lock, User, ArrowLeft } from 'lucide-react';
-import { useAuth } from '@/components/AuthProvider';
+import { Eye, EyeOff, User, Mail, Lock, ArrowRight } from 'lucide-react';
 
 interface SignupFormProps {
-  onSignup: (userData: { name: string; email: string; password: string }) => void;
+  onSignup: (userData: {
+    name: string;
+    email: string;
+    password: string;
+  }) => void;
   onBackToLogin: () => void;
 }
 
 export function SignupForm({ onSignup, onBackToLogin }: SignupFormProps) {
-  const { signUp } = useAuth();
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: ''
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLoading, setIsLoading] = useState(false);
+
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name.trim()) {
+      newErrors.name = 'Nome é obrigatório';
+    }
+
+    if (!formData.email.trim()) {
+      newErrors.email = 'E-mail é obrigatório';
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      newErrors.email = 'E-mail inválido';
+    }
+
+    if (!formData.password) {
+      newErrors.password = 'Senha é obrigatória';
+    } else if (formData.password.length < 6) {
+      newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      newErrors.confirmPassword = 'Senhas não coincidem';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setError('');
+    
+    if (!validateForm()) return;
 
-    if (password !== confirmPassword) {
-      setError('As senhas não coincidem');
-      setLoading(false);
-      return;
-    }
+    setIsLoading(true);
+    
+    // Simular delay de API
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    onSignup({
+      name: formData.name,
+      email: formData.email,
+      password: formData.password
+    });
+    
+    setIsLoading(false);
+  };
 
-    if (password.length < 6) {
-      setError('A senha deve ter pelo menos 6 caracteres');
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { error } = await signUp(email, password, name);
-      
-      if (error) {
-        setError(error.message);
-      } else {
-        onSignup({ name, email, password });
-      }
-    } catch (err) {
-      setError('Erro inesperado. Tente novamente.');
-    } finally {
-      setLoading(false);
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+    if (errors[field]) {
+      setErrors(prev => ({ ...prev, [field]: '' }));
     }
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center p-4">
-      <Card className="w-full max-w-md bg-gray-900/50 border-gray-700 backdrop-blur-sm">
-        <CardHeader className="text-center">
-          <div className="flex items-center justify-center mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onBackToLogin}
-              className="absolute left-4 top-4 text-gray-400 hover:text-white"
-            >
-              <ArrowLeft className="h-4 w-4" />
-            </Button>
-          </div>
-          <CardTitle className="text-2xl text-white">Criar conta</CardTitle>
-          <CardDescription className="text-gray-400">
-            Cadastre-se para começar a usar a plataforma
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <Alert className="border-red-500/50 bg-red-500/10">
-                <AlertDescription className="text-red-300">
-                  {error}
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-gray-300">Nome completo</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Seu nome completo"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="pl-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                  required
-                />
-              </div>
+      <div className="w-full max-w-md">
+        <Card className="bg-gray-900/80 border-gray-700/50 backdrop-blur-sm shadow-2xl">
+          <CardHeader className="text-center pb-6">
+            <div className="w-16 h-16 bg-gradient-to-r from-red-600 to-red-800 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <User className="w-8 h-8 text-white" />
             </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="email" className="text-gray-300">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="seu@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="password" className="text-gray-300">Senha</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="Mínimo 6 caracteres"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                  required
-                />
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-gray-300">Confirmar senha</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  id="confirmPassword"
-                  type="password"
-                  placeholder="Confirme sua senha"
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="pl-10 bg-gray-800 border-gray-600 text-white placeholder-gray-400"
-                  required
-                />
-              </div>
-            </div>
-            
-            <Button 
-              type="submit" 
-              className="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900"
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Criando conta...
-                </>
-              ) : (
-                'Criar conta'
-              )}
-            </Button>
-          </form>
+            <CardTitle className="text-2xl font-bold text-white">
+              Criar Conta
+            </CardTitle>
+            <CardDescription className="text-gray-400">
+              Preencha seus dados para começar
+            </CardDescription>
+          </CardHeader>
           
-          <div className="mt-6 text-center">
-            <p className="text-gray-400 text-sm">
-              Já tem uma conta?{' '}
-              <button
-                onClick={onBackToLogin}
-                className="text-red-400 hover:text-red-300 font-medium"
+          <CardContent>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              {/* Nome */}
+              <div className="space-y-2">
+                <Label htmlFor="name" className="text-gray-300">
+                  Nome Completo
+                </Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Seu nome completo"
+                    value={formData.name}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    className="pl-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:border-red-500"
+                  />
+                </div>
+                {errors.name && (
+                  <p className="text-red-400 text-sm">{errors.name}</p>
+                )}
+              </div>
+
+              {/* E-mail */}
+              <div className="space-y-2">
+                <Label htmlFor="email" className="text-gray-300">
+                  E-mail
+                </Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="seu@email.com"
+                    value={formData.email}
+                    onChange={(e) => handleInputChange('email', e.target.value)}
+                    className="pl-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:border-red-500"
+                  />
+                </div>
+                {errors.email && (
+                  <p className="text-red-400 text-sm">{errors.email}</p>
+                )}
+              </div>
+
+              {/* Senha */}
+              <div className="space-y-2">
+                <Label htmlFor="password" className="text-gray-300">
+                  Senha
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Sua senha"
+                    value={formData.password}
+                    onChange={(e) => handleInputChange('password', e.target.value)}
+                    className="pl-10 pr-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:border-red-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="text-red-400 text-sm">{errors.password}</p>
+                )}
+              </div>
+
+              {/* Confirmar Senha */}
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword" className="text-gray-300">
+                  Confirmar Senha
+                </Label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+                  <Input
+                    id="confirmPassword"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    placeholder="Confirme sua senha"
+                    value={formData.confirmPassword}
+                    onChange={(e) => handleInputChange('confirmPassword', e.target.value)}
+                    className="pl-10 pr-10 bg-gray-800/50 border-gray-600 text-white placeholder-gray-400 focus:border-red-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-300"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {errors.confirmPassword && (
+                  <p className="text-red-400 text-sm">{errors.confirmPassword}</p>
+                )}
+              </div>
+
+              {/* Botão de Cadastro */}
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-white font-semibold py-3 mt-6 shadow-lg hover:shadow-red-500/25 transition-all"
               >
-                Faça login
-              </button>
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+                {isLoading ? (
+                  <div className="flex items-center">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
+                    Criando conta...
+                  </div>
+                ) : (
+                  <div className="flex items-center">
+                    Criar Conta
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </div>
+                )}
+              </Button>
+            </form>
+
+            {/* Link para Login */}
+            <div className="text-center mt-6 pt-6 border-t border-gray-700">
+              <p className="text-gray-400 text-sm">
+                Já tem uma conta?{' '}
+                <button
+                  onClick={onBackToLogin}
+                  className="text-red-400 hover:text-red-300 font-medium transition-colors"
+                >
+                  Fazer login
+                </button>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
