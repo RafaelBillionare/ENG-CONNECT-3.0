@@ -11,6 +11,12 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   
+  // Configurações para resolver problemas de HMR e RSC
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
+    serverComponentsExternalPackages: ['@supabase/supabase-js'],
+  },
+  
   // Configuração de imagens para principais provedores
   images: {
     remotePatterns: [
@@ -191,11 +197,6 @@ const nextConfig: NextConfig = {
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
   },
   
-  // Configuração experimental para melhor performance
-  experimental: {
-    optimizePackageImports: ['lucide-react', '@radix-ui/react-icons'],
-  },
-  
   // Headers CORS para permitir acesso da plataforma Lasy
   async headers() {
     return [
@@ -221,6 +222,17 @@ const nextConfig: NextConfig = {
         ]
       }
     ]
+  },
+  
+  // Configurações para resolver problemas de rede e HMR
+  webpack: (config, { dev, isServer }) => {
+    if (dev && !isServer) {
+      config.watchOptions = {
+        poll: 1000,
+        aggregateTimeout: 300,
+      };
+    }
+    return config;
   },
 };
 

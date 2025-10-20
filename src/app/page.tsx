@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { 
   Search, 
   MapPin, 
@@ -36,7 +37,12 @@ import {
   Calendar,
   DollarSign,
   Upload,
-  FileText
+  FileText,
+  User,
+  BarChart3,
+  Send,
+  LogOut,
+  Edit
 } from 'lucide-react';
 import { mockProjects, mockEngineers, mockProposals, formatCurrency, formatDate } from '@/lib/data';
 import { CreateProjectModal } from '@/components/CreateProjectModal';
@@ -46,12 +52,13 @@ import { LoginForm } from '@/components/LoginForm';
 import { SignupForm } from '@/components/SignupForm';
 import { ProfileSetup } from '@/components/ProfileSetup';
 import { Project, Engineer, Proposal, ProposalStatus, User } from '@/lib/types';
+import { useAuth } from '@/components/AuthProvider';
 
 type AppState = 'landing' | 'login' | 'signup' | 'profile-setup' | 'dashboard';
 
 export default function Home() {
+  const { user, loading, signOut } = useAuth();
   const [appState, setAppState] = useState<AppState>('landing');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [signupData, setSignupData] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [showCreateProject, setShowCreateProject] = useState(false);
@@ -64,27 +71,39 @@ export default function Home() {
   const [projectToView, setProjectToView] = useState<Project | null>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  const handleLogin = (credentials: { email: string; password: string }) => {
-    // Simular login - em produção, fazer chamada para API
-    const mockUser: User = {
-      id: '1',
-      name: 'João Silva',
-      email: credentials.email,
-      type: 'company', // Seria determinado pela API
-      createdAt: new Date()
-    };
-    setCurrentUser(mockUser);
-    setAppState('dashboard');
+  // Efeito para gerenciar estado baseado na autenticação
+  useEffect(() => {
+    if (!loading) {
+      if (user) {
+        if (!user.profile) {
+          setAppState('profile-setup');
+        } else {
+          setAppState('dashboard');
+        }
+      } else {
+        setAppState('landing');
+      }
+    }
+  }, [user, loading]);
+
+  const handleLogin = () => {
+    // O AuthProvider já gerencia o estado do usuário
+    // Não precisamos fazer nada aqui
   };
 
   const handleSignup = (userData: { name: string; email: string; password: string }) => {
     setSignupData(userData);
+    // O AuthProvider já criou o usuário, mas ainda não tem perfil completo
     setAppState('profile-setup');
   };
 
-  const handleProfileComplete = (profileData: any) => {
-    setCurrentUser(profileData);
-    setAppState('dashboard');
+  const handleProfileComplete = async (profileData: any) => {
+    // Atualizar perfil no Supabase
+    if (user) {
+      const { updateProfile } = await import('@/lib/auth');
+      await updateProfile(user.id, profileData);
+      setAppState('dashboard');
+    }
   };
 
   const handleCreateProject = (projectData: any) => {
@@ -94,8 +113,8 @@ export default function Home() {
       companyId: '1',
       company: {
         id: '1',
-        name: 'João Silva',
-        email: 'joao@techcorp.com',
+        name: user?.profile?.name || 'Usuário',
+        email: user?.email || '',
         type: 'company',
         companyName: 'TechCorp Solutions',
         cnpj: '12.345.678/0001-90',
@@ -151,10 +170,8 @@ export default function Home() {
     }
   };
 
-  // NOVA FUNÇÃO: Enviar currículo do candidato para o painel da empresa
   const handleSubmitApplication = () => {
     if (selectedFile && projectToView) {
-      // Criar nova proposta com dados do currículo do engenheiro
       const curriculumProposal: Proposal = {
         id: Date.now().toString(),
         projectId: projectToView.id,
@@ -173,33 +190,9 @@ export default function Home() {
         }]
       };
 
-      // Adicionar proposta à lista (será visível no painel da empresa)
       setProposals(prev => [curriculumProposal, ...prev]);
 
-      // Simular notificação para a empresa
-      const companyNotification = {
-        type: 'new_application',
-        message: `Nova candidatura recebida de ${selectedEngineer.name} para a vaga "${projectToView.title}"`,
-        engineerData: {
-          name: selectedEngineer.name,
-          email: selectedEngineer.email,
-          title: selectedEngineer.title,
-          experience: selectedEngineer.experience,
-          specialties: selectedEngineer.specialties,
-          location: selectedEngineer.location,
-          rating: selectedEngineer.rating,
-          hourlyRate: selectedEngineer.hourlyRate,
-          availability: selectedEngineer.availability,
-          phone: selectedEngineer.phone || 'Não informado'
-        },
-        curriculumFile: selectedFile.name,
-        timestamp: new Date()
-      };
-
-      // Em produção, isso seria enviado via API para o painel da empresa
-      console.log('Dados enviados para o painel da empresa:', companyNotification);
-
-      alert(`✅ Currículo enviado com sucesso!\n\nSeus dados profissionais e o arquivo "${selectedFile.name}" foram enviados para ${projectToView.company.companyName}.\n\nO recrutador poderá visualizar:\n• Seu perfil completo\n• Experiência e especialidades\n• Currículo anexado\n• Informações de contato\n\nVocê será notificado sobre o status da sua candidatura.`);
+      alert(`✅ Currículo enviado com sucesso!\\n\\nSeus dados profissionais e o arquivo \"${selectedFile.name}\" foram enviados para ${projectToView.company.companyName}.\\n\\nO recrutador poderá visualizar:\\n• Seu perfil completo\\n• Experiência e especialidades\\n• Currículo anexado\\n• Informações de contato\\n\\nVocê será notificado sobre o status da sua candidatura.`);
       
       setSelectedFile(null);
       setShowProjectDetails(false);
@@ -207,6 +200,20 @@ export default function Home() {
       alert('Por favor, selecione um arquivo PDF do seu currículo.');
     }
   };
+
+  const handleSignOut = async () => {
+    await signOut();
+    setAppState('landing');
+  };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black flex items-center justify-center">
+        <div className="text-white">Carregando...</div>
+      </div>
+    );
+  }
 
   // Renderizar diferentes estados da aplicação
   if (appState === 'login') {
@@ -227,16 +234,24 @@ export default function Home() {
     );
   }
 
-  if (appState === 'profile-setup' && signupData) {
+  if (appState === 'profile-setup' && (signupData || user)) {
     return (
       <ProfileSetup 
-        userData={signupData}
+        userData={signupData || { name: user?.user_metadata?.name || '', email: user?.email || '' }}
         onComplete={handleProfileComplete}
       />
     );
   }
 
-  if (appState === 'dashboard' && currentUser) {
+  if (appState === 'dashboard' && user) {
+    const currentUser: User = {
+      id: user.id,
+      name: user.profile?.name || user.user_metadata?.name || 'Usuário',
+      email: user.email || '',
+      type: 'company', // Seria determinado pelo perfil
+      createdAt: new Date(user.created_at)
+    };
+
     return (
       <div className="min-h-screen bg-gradient-to-br from-black via-gray-900 to-black">
         {/* Header */}
@@ -259,18 +274,120 @@ export default function Home() {
                 <Button 
                   variant="ghost" 
                   className="text-gray-300 hover:text-white"
-                  onClick={() => {
-                    setCurrentUser(null);
-                    setAppState('landing');
-                  }}
+                  onClick={handleSignOut}
                 >
                   Sair
                 </Button>
-                <Avatar>
-                  <AvatarFallback className="bg-red-600 text-white">
-                    {currentUser.name.split(' ').map(n => n[0]).join('')}
-                  </AvatarFallback>
-                </Avatar>
+                
+                {/* Profile Dropdown Menu */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" className="relative h-8 w-8 rounded-full p-0">
+                      <Avatar>
+                        <AvatarFallback className="flex size-full items-center justify-center rounded-full bg-red-600 text-white">
+                          {currentUser.name.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent className="w-80 bg-gray-900 border-gray-700" align="end" forceMount>
+                    {/* User Info Header */}
+                    <div className="flex items-center space-x-3 p-4 border-b border-gray-700">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-red-600 text-white text-lg">
+                          {currentUser.name.split(' ').map(n => n[0]).join('')}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-white font-semibold truncate">{currentUser.name}</p>
+                        <p className="text-gray-400 text-sm truncate">{currentUser.email}</p>
+                        <Badge 
+                          variant="outline" 
+                          className="mt-1 text-xs border-red-500/30 text-red-300 bg-red-500/10"
+                        >
+                          {currentUser.type === 'company' ? 'Empresa' : 'Engenheiro'}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <DropdownMenuLabel className="text-gray-300 text-xs uppercase tracking-wide px-4 py-2">
+                      Perfil & Configurações
+                    </DropdownMenuLabel>
+                    
+                    <DropdownMenuItem 
+                      className="text-gray-300 hover:text-white hover:bg-gray-800 cursor-pointer px-4 py-3"
+                      onClick={() => window.location.href = '/editar-meu-perfil'}
+                    >
+                      <Edit className="mr-3 h-4 w-4 text-blue-400" />
+                      <div className="flex-1">
+                        <div className="font-medium">Editar Perfil</div>
+                        <div className="text-xs text-gray-500">Atualize suas informações pessoais</div>
+                      </div>
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800 cursor-pointer px-4 py-3">
+                      <FileText className="mr-3 h-4 w-4 text-green-400" />
+                      <div className="flex-1">
+                        <div className="font-medium">Cadastrar Currículo</div>
+                        <div className="text-xs text-gray-500">Adicione ou atualize seu currículo</div>
+                      </div>
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800 cursor-pointer px-4 py-3">
+                      <Briefcase className="mr-3 h-4 w-4 text-purple-400" />
+                      <div className="flex-1">
+                        <div className="font-medium">Cadastrar Portfólio</div>
+                        <div className="text-xs text-gray-500">Mostre seus melhores projetos</div>
+                      </div>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator className="bg-gray-700" />
+                    
+                    <DropdownMenuLabel className="text-gray-300 text-xs uppercase tracking-wide px-4 py-2">
+                      Dashboard & Estatísticas
+                    </DropdownMenuLabel>
+                    
+                    <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800 cursor-pointer px-4 py-3">
+                      <BarChart3 className="mr-3 h-4 w-4 text-yellow-400" />
+                      <div className="flex-1">
+                        <div className="font-medium">Estatísticas de Vagas</div>
+                        <div className="text-xs text-gray-500">Veja suas candidaturas e resultados</div>
+                      </div>
+                      <Badge variant="secondary" className="bg-yellow-500/20 text-yellow-300 text-xs">
+                        12
+                      </Badge>
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800 cursor-pointer px-4 py-3">
+                      <Send className="mr-3 h-4 w-4 text-cyan-400" />
+                      <div className="flex-1">
+                        <div className="font-medium">Propostas Enviadas</div>
+                        <div className="text-xs text-gray-500">Acompanhe suas propostas ativas</div>
+                      </div>
+                      <Badge variant="secondary" className="bg-cyan-500/20 text-cyan-300 text-xs">
+                        8
+                      </Badge>
+                    </DropdownMenuItem>
+                    
+                    <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800 cursor-pointer px-4 py-3">
+                      <TrendingUp className="mr-3 h-4 w-4 text-red-400" />
+                      <div className="flex-1">
+                        <div className="font-medium">Meu Dashboard</div>
+                        <div className="text-xs text-gray-500">Visão geral completa da sua atividade</div>
+                      </div>
+                    </DropdownMenuItem>
+
+                    <DropdownMenuSeparator className="bg-gray-700" />
+                    
+                    <DropdownMenuItem 
+                      className="text-red-300 hover:text-red-200 hover:bg-red-900/20 cursor-pointer px-4 py-3"
+                      onClick={handleSignOut}
+                    >
+                      <LogOut className="mr-3 h-4 w-4" />
+                      <div className="font-medium">Sair da Conta</div>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
           </div>
@@ -750,6 +867,19 @@ interface CompanyDashboardProps {
 function CompanyDashboard({ searchTerm, setSearchTerm, onCreateProject, proposals, onUpdateProposalStatus }: CompanyDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
 
+  // Filtrar engenheiros baseado no termo de busca
+  const filteredEngineers = mockEngineers.filter(engineer => {
+    if (!searchTerm) return true;
+    
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      engineer.name.toLowerCase().includes(searchLower) ||
+      engineer.title.toLowerCase().includes(searchLower) ||
+      engineer.location.toLowerCase().includes(searchLower) ||
+      engineer.specialties.some(specialty => specialty.toLowerCase().includes(searchLower))
+    );
+  });
+
   return (
     <div className="space-y-8">
       {/* Welcome Section */}
@@ -892,7 +1022,7 @@ function CompanyDashboard({ searchTerm, setSearchTerm, onCreateProject, proposal
               </div>
 
               <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {mockEngineers.map((engineer) => (
+                {filteredEngineers.map((engineer) => (
                   <Card key={engineer.id} className="bg-gray-800/50 border-gray-600">
                     <CardHeader className="pb-4">
                       <div className="flex items-start justify-between">
@@ -949,6 +1079,23 @@ function CompanyDashboard({ searchTerm, setSearchTerm, onCreateProject, proposal
                   </Card>
                 ))}
               </div>
+
+              {filteredEngineers.length === 0 && searchTerm && (
+                <div className="text-center py-12">
+                  <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-white text-lg font-medium mb-2">Nenhum engenheiro encontrado</h3>
+                  <p className="text-gray-400 mb-4">
+                    Não encontramos engenheiros que correspondam à sua busca por "{searchTerm}".
+                  </p>
+                  <Button 
+                    onClick={() => setSearchTerm('')}
+                    variant="outline"
+                    className="border-gray-600 text-gray-300 hover:bg-gray-800"
+                  >
+                    Limpar Busca
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -1002,10 +1149,24 @@ interface EngineerDashboardProps {
 function EngineerDashboard({ searchTerm, setSearchTerm, projects, onSendProposal, onViewDetails }: EngineerDashboardProps) {
   const [activeFilter, setActiveFilter] = useState<'all' | 'freelance' | 'clt'>('all');
 
-  // Filtrar projetos baseado no filtro ativo
+  // Filtrar projetos baseado no filtro ativo E termo de busca
   const filteredProjects = projects.filter(project => {
-    if (activeFilter === 'all') return true;
-    return project.type === activeFilter;
+    // Filtro por tipo
+    const typeMatch = activeFilter === 'all' || project.type === activeFilter;
+    
+    // Filtro por termo de busca
+    if (!searchTerm) return typeMatch;
+    
+    const searchLower = searchTerm.toLowerCase();
+    const searchMatch = (
+      project.title.toLowerCase().includes(searchLower) ||
+      project.description.toLowerCase().includes(searchLower) ||
+      project.location.toLowerCase().includes(searchLower) ||
+      project.company.companyName.toLowerCase().includes(searchLower) ||
+      project.skills.some(skill => skill.toLowerCase().includes(searchLower))
+    );
+    
+    return typeMatch && searchMatch;
   });
 
   return (
@@ -1171,20 +1332,26 @@ function EngineerDashboard({ searchTerm, setSearchTerm, projects, onSendProposal
             {filteredProjects.length === 0 ? (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Filter className="w-8 h-8 text-gray-400" />
+                  {searchTerm ? <Search className="w-8 h-8 text-gray-400" /> : <Filter className="w-8 h-8 text-gray-400" />}
                 </div>
                 <h3 className="text-white text-lg font-medium mb-2">
-                  Nenhum projeto encontrado
+                  {searchTerm ? 'Nenhum projeto encontrado' : 'Nenhum projeto disponível'}
                 </h3>
                 <p className="text-gray-400 mb-4">
-                  Não há projetos disponíveis para o filtro selecionado.
+                  {searchTerm 
+                    ? `Não encontramos projetos que correspondam à sua busca por "${searchTerm}".`
+                    : 'Não há projetos disponíveis para o filtro selecionado.'
+                  }
                 </p>
                 <Button 
-                  onClick={() => setActiveFilter('all')}
+                  onClick={() => {
+                    setSearchTerm('');
+                    setActiveFilter('all');
+                  }}
                   variant="outline"
                   className="border-gray-600 text-gray-300 hover:bg-gray-800"
                 >
-                  Ver Todos os Projetos
+                  {searchTerm ? 'Limpar Busca' : 'Ver Todos os Projetos'}
                 </Button>
               </div>
             ) : (
@@ -1252,11 +1419,15 @@ function EngineerDashboard({ searchTerm, setSearchTerm, projects, onSendProposal
                     <div className="flex flex-col space-y-2 ml-4 shrink-0">
                       <Button 
                         size="sm"
-                        className="bg-gradient-to-r from-red-600 to-red-800 hover:from-red-700 hover:to-red-900 text-xs px-3 py-1"
+                        className={`text-xs px-3 py-1 ${
+                          project.type === 'freelance' 
+                            ? 'bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-700 hover:to-blue-900' 
+                            : 'bg-gradient-to-r from-green-600 to-green-800 hover:from-green-700 hover:to-green-900'
+                        }`}
                         onClick={() => onSendProposal(project)}
                       >
                         <MessageSquare className="w-3 h-3 mr-1" />
-                        {project.type === 'clt' ? 'Candidatar' : 'Proposta'}
+                        {project.type === 'clt' ? 'Enviar Currículo' : 'Proposta'}
                       </Button>
                       <Button 
                         size="sm"
