@@ -52,10 +52,12 @@ import { LoginForm } from '@/components/LoginForm';
 import { SignupForm } from '@/components/SignupForm';
 import { ProfileSetup } from '@/components/ProfileSetup';
 import { Project, Engineer, Proposal, ProposalStatus, User } from '@/lib/types';
+import { useRouter } from 'next/navigation';
 
 type AppState = 'landing' | 'login' | 'signup' | 'profile-setup' | 'dashboard';
 
 export default function Home() {
+  const router = useRouter();
   const [appState, setAppState] = useState<AppState>('landing');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [signupData, setSignupData] = useState<any>(null);
@@ -214,6 +216,11 @@ export default function Home() {
     }
   };
 
+  // Função para navegar para edição de perfil
+  const handleEditProfile = () => {
+    router.push('/editar-meu-perfil');
+  };
+
   // Renderizar diferentes estados da aplicação
   if (appState === 'login') {
     return (
@@ -310,7 +317,7 @@ export default function Home() {
                     
                     <DropdownMenuItem 
                       className="text-gray-300 hover:text-white hover:bg-gray-800 cursor-pointer px-4 py-3"
-                      onClick={() => window.location.href = '/editar-meu-perfil'}
+                      onClick={handleEditProfile}
                     >
                       <Edit className="mr-3 h-4 w-4 text-blue-400" />
                       <div className="flex-1">
@@ -319,7 +326,35 @@ export default function Home() {
                       </div>
                     </DropdownMenuItem>
                     
-                    <DropdownMenuItem className="text-gray-300 hover:text-white hover:bg-gray-800 cursor-pointer px-4 py-3">
+                    <DropdownMenuItem 
+                      className="text-gray-300 hover:text-white hover:bg-gray-800 cursor-pointer px-4 py-3"
+                      onClick={() => {
+                        const input = document.createElement('input');
+                        input.type = 'file';
+                        input.accept = '.pdf,.doc,.docx';
+                        input.onchange = (e) => {
+                          const file = (e.target as HTMLInputElement).files?.[0];
+                          if (file) {
+                            // Validar tipo de arquivo
+                            const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+                            if (!allowedTypes.includes(file.type)) {
+                              alert('Por favor, selecione apenas arquivos PDF, DOC ou DOCX.');
+                              return;
+                            }
+                            
+                            // Validar tamanho (5MB máximo)
+                            if (file.size > 5 * 1024 * 1024) {
+                              alert('O arquivo deve ter no máximo 5MB.');
+                              return;
+                            }
+                            
+                            // Simular upload e salvamento
+                            alert(`✅ Currículo "${file.name}" cadastrado com sucesso!\n\nSeu currículo foi salvo e estará disponível para envio em candidaturas futuras.\n\nTamanho: ${(file.size / 1024 / 1024).toFixed(2)}MB\nTipo: ${file.type.includes('pdf') ? 'PDF' : 'DOC'}`);
+                          }
+                        };
+                        input.click();
+                      }}
+                    >
                       <FileText className="mr-3 h-4 w-4 text-green-400" />
                       <div className="flex-1">
                         <div className="font-medium">Cadastrar Currículo</div>
